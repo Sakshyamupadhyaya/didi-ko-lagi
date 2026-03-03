@@ -102,8 +102,7 @@
             display: flex;
             justify-content: center;
             gap: 30px;
-            background: rgba(10, 10, 26, 0.8);
-            backdrop-filter: blur(20px);
+            background: rgba(10, 10, 26, 0.9);
             border-bottom: 1px solid rgba(255, 107, 157, 0.2);
         }
 
@@ -573,6 +572,7 @@
             pointer-events: none;
             z-index: 0;
             opacity: 0.6;
+            will-change: transform, opacity;
         }
 
         @keyframes balloonFloat {
@@ -607,7 +607,8 @@
             position: fixed;
             pointer-events: none;
             z-index: 9999;
-            animation: sparkleFade 0.8s ease forwards;
+            animation: sparkleFade 0.6s ease forwards;
+            will-change: transform, opacity;
         }
 
         @keyframes sparkleFade {
@@ -625,6 +626,7 @@
             z-index: 9998;
             pointer-events: none;
             animation: confettiFall linear forwards;
+            will-change: transform, opacity;
         }
 
         @keyframes confettiFall {
@@ -636,10 +638,11 @@
         .glow-orb {
             position: fixed;
             border-radius: 50%;
-            filter: blur(80px);
+            filter: blur(40px);
             pointer-events: none;
             z-index: 0;
             animation: orbFloat 10s ease-in-out infinite alternate;
+            will-change: transform;
         }
 
         @keyframes orbFloat {
@@ -858,6 +861,9 @@
     </footer>
 
     <script>
+        // ===== MOBILE DETECTION =====
+        const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+
         // ===== PRELOADER =====
         window.addEventListener('load', () => {
             setTimeout(() => {
@@ -907,27 +913,29 @@
             }
         }
 
-        for (let i = 0; i < 80; i++) particles.push(new Particle());
+        for (let i = 0; i < (isMobile ? 20 : 80); i++) particles.push(new Particle());
 
         function animateParticles() {
             pCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
             particles.forEach(p => { p.update(); p.draw(); });
 
-            // Draw connections
-            for (let i = 0; i < particles.length; i++) {
-                for (let j = i + 1; j < particles.length; j++) {
-                    const dx = particles[i].x - particles[j].x;
-                    const dy = particles[i].y - particles[j].y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < 120) {
-                        pCtx.beginPath();
-                        pCtx.strokeStyle = particles[i].color;
-                        pCtx.globalAlpha = (120 - dist) / 120 * 0.08;
-                        pCtx.lineWidth = 0.5;
-                        pCtx.moveTo(particles[i].x, particles[i].y);
-                        pCtx.lineTo(particles[j].x, particles[j].y);
-                        pCtx.stroke();
-                        pCtx.globalAlpha = 1;
+            // Draw connections - skip on mobile for performance
+            if (!isMobile) {
+                for (let i = 0; i < particles.length; i++) {
+                    for (let j = i + 1; j < particles.length; j++) {
+                        const dx = particles[i].x - particles[j].x;
+                        const dy = particles[i].y - particles[j].y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < 120) {
+                            pCtx.beginPath();
+                            pCtx.strokeStyle = particles[i].color;
+                            pCtx.globalAlpha = (120 - dist) / 120 * 0.08;
+                            pCtx.lineWidth = 0.5;
+                            pCtx.moveTo(particles[i].x, particles[i].y);
+                            pCtx.lineTo(particles[j].x, particles[j].y);
+                            pCtx.stroke();
+                            pCtx.globalAlpha = 1;
+                        }
                     }
                 }
             }
@@ -937,8 +945,9 @@
 
         // ===== CONFETTI BURST =====
         function launchConfettiBurst() {
+            const count = isMobile ? 40 : 150;
             const colors = ['#ff6b9d', '#c44dff', '#ffd700', '#ff6f61', '#87ceeb', '#98ff98', '#ff69b4', '#7b68ee'];
-            for (let i = 0; i < 150; i++) {
+            for (let i = 0; i < count; i++) {
                 const piece = document.createElement('div');
                 piece.className = 'confetti-piece';
                 piece.style.left = Math.random() * 100 + 'vw';
@@ -955,7 +964,8 @@
         // ===== SPARKLE MOUSE TRAIL =====
         let lastSparkle = 0;
         document.addEventListener('mousemove', (e) => {
-            if (Date.now() - lastSparkle < 50) return;
+            if (isMobile) return; // disable on mobile - touchmove is too heavy
+            if (Date.now() - lastSparkle < 80) return;
             lastSparkle = Date.now();
             const sparkle = document.createElement('div');
             sparkle.className = 'sparkle';
@@ -964,7 +974,7 @@
             sparkle.style.top = e.clientY + 'px';
             sparkle.style.fontSize = Math.random() * 15 + 10 + 'px';
             document.body.appendChild(sparkle);
-            setTimeout(() => sparkle.remove(), 800);
+            setTimeout(() => sparkle.remove(), 600);
         });
 
         // ===== FLOATING BALLOONS =====
@@ -979,7 +989,7 @@
             document.body.appendChild(balloon);
             setTimeout(() => balloon.remove(), 16000);
         }
-        setInterval(spawnBalloon, 3000);
+        setInterval(spawnBalloon, isMobile ? 8000 : 3000);
 
         // ===== SCROLL REVEAL =====
         const revealElements = document.querySelectorAll('.reveal');
@@ -1114,11 +1124,13 @@
                 ctx.fillRect(x, canvas.height - 60, 15, 3);
             }
 
-            // Flowers on ground
-            for (let x = 10; x < canvas.width; x += 50) {
-                const bobble = Math.sin(frameCount * 0.03 + x) * 2;
-                ctx.font = '14px serif';
-                ctx.fillText(['🌸', '🌼', '🌺', '🌻'][Math.floor(x / 50) % 4], x, canvas.height - 62 + bobble);
+            // Flowers on ground - skip on mobile for performance
+            if (!isMobile) {
+                for (let x = 10; x < canvas.width; x += 50) {
+                    const bobble = Math.sin(frameCount * 0.03 + x) * 2;
+                    ctx.font = '14px serif';
+                    ctx.fillText(['🌸', '🌼', '🌺', '🌻'][Math.floor(x / 50) % 4], x, canvas.height - 62 + bobble);
+                }
             }
         }
 
@@ -1257,7 +1269,8 @@
         function drawSprinkles(x, y, width, height, stableSeed) {
             const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff69b4', '#00ffff'];
             const rng = mulberry32(stableSeed || 0);
-            for (let i = 0; i < 12; i++) {
+            const count = isMobile ? 5 : 12;
+            for (let i = 0; i < count; i++) {
                 const sx = x + rng() * width;
                 const sy = y + rng() * height;
                 const angle = rng() * Math.PI;
@@ -1672,8 +1685,9 @@
 
         // ===== BIRTHDAY AUDIO (optional confetti on click) =====  
         document.body.addEventListener('click', (e) => {
-            // Mini confetti burst on click
-            for (let i = 0; i < 8; i++) {
+            // Mini confetti burst on click - reduced on mobile
+            const count = isMobile ? 3 : 8;
+            for (let i = 0; i < count; i++) {
                 const piece = document.createElement('div');
                 piece.className = 'confetti-piece';
                 piece.style.left = e.clientX + 'px';
